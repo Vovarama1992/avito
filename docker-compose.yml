@@ -1,38 +1,45 @@
-version: "3.9"
+.PHONY: refresh full-refresh build up down logs app-logs commit
 
-services:
-  db:
-    image: postgres:16-alpine
-    container_name: avito_monitor_db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-app}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    volumes:
-      - avito_monitor_pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}",
-        ]
-      interval: 2s
-      timeout: 3s
-      retries: 10
+APP=avito_app
 
-  app:
-    build: .
-    container_name: avito_monitor_app
-    environment:
-      DATABASE_URL: ${DATABASE_URL:-postgres://app:app@db:5432/app?sslmode=disable}
-      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-30}
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
+# --- быстрый деплой ---
+refresh:
+	git pull origin main
+	docker compose build app
+	docker compose stop app
+	docker compose up -d --no-deps app
+	docker compose logs -f app
 
-volumes:
-  avito_monitor_pgdata:
+# --- полный рефреш ---
+full-refresh:
+	git pull origin main
+	docker compose down
+	docker compose build --no-cache
+	docker compose up -d
+	docker compose logs -f app
+
+# --- сборка контейнеров ---
+build:
+	docker compose build
+
+# --- поднять ---
+up:
+	docker compose up -d
+
+# --- остановить ---
+down:
+	docker compose down
+
+# --- логи всех сервисов ---
+logs:
+	docker compose logs -f
+
+# --- логи приложения ---
+app-logs:
+	docker logs --tail=100 -f $(APP)
+
+# --- Git ---
+commit:
+	git add .
+	git commit -m "$${m:-update}"
+	git push origin main
