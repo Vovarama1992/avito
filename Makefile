@@ -1,10 +1,11 @@
+```
 .PHONY: refresh full-refresh build up down logs app-logs commit
 
 APP=avito_app
 
 # --- быстрый деплой ---
 refresh:
-	git pull origin master
+	git pull origin main
 	docker compose build app
 	docker compose stop app
 	docker compose up -d --no-deps app
@@ -12,7 +13,7 @@ refresh:
 
 # --- полный рефреш ---
 full-refresh:
-	git pull origin master
+	git pull origin main
 	docker compose down
 	docker compose build --no-cache
 	docker compose up -d
@@ -42,4 +43,5 @@ app-logs:
 commit:
 	git add .
 	git commit -m "$${m:-update}"
-	git push origin master
+	git push origin main
+```
