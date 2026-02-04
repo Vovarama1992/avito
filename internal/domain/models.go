@@ -1,14 +1,14 @@
 package domain
 
-type AvitoWebhookPayload struct {
-	Messages []AvitoMessage `json:"messages"`
-}
-
-type AvitoMessage struct {
-	Type    string       `json:"type"`
-	Content AvitoContent `json:"content"`
-}
-
-type AvitoContent struct {
-	Text string `json:"text"`
+type AvitoWebhook struct {
+	Type    string `json:"type"`
+	Payload struct {
+		Message struct {
+			ID       string `json:"id"`
+			Text     string `json:"text"`
+			AuthorID string `json:"author_id"`
+			ChatID   string `json:"chat_id"`
+			Created  int64  `json:"created"`
+		} `json:"message"`
+	} `json:"payload"`
 }

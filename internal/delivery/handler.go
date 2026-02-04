@@ -27,16 +27,24 @@ func (h *WebhookHandler) HandleAvitoWebhook(w http.ResponseWriter, r *http.Reque
 	bodyBytes, _ := io.ReadAll(r.Body)
 	log.Println("RAW BODY:", string(bodyBytes))
 
-	var payload domain.AvitoWebhookPayload
+	var payload domain.AvitoWebhook
+
 	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
 		log.Println("DECODE ERROR:", err)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("MESSAGES COUNT: %d\n", len(payload.Messages))
+	if payload.Type != "message_new" {
+		log.Println("SKIP EVENT TYPE:", payload.Type)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
-	h.svc.ProcessWebhook(r.Context(), payload)
+	text := payload.Payload.Message.Text
+	log.Println("TEXT:", text)
+
+	h.svc.ProcessMessage(r.Context(), text)
 
 	w.WriteHeader(http.StatusOK)
 }
