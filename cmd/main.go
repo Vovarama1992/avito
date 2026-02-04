@@ -15,10 +15,20 @@ import (
 )
 
 func main() {
-	// --- telegram ---
+	log.Println("=== AVITO APP START ===")
+
+	// --- env ---
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
 	chatIDStr := os.Getenv("TELEGRAM_CHAT_ID")
+	port := os.Getenv("PORT")
 
+	log.Println("PORT:", port)
+	log.Println("TELEGRAM_CHAT_ID:", chatIDStr)
+	if len(token) > 10 {
+		log.Println("TELEGRAM_TOKEN_PREFIX:", token[:10])
+	}
+
+	// --- telegram ---
 	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
 	if err != nil {
 		log.Fatal("invalid TELEGRAM_CHAT_ID")
@@ -28,6 +38,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	log.Println("Telegram bot authorized as:", api.Self.UserName)
 
 	tgSender := telegram.NewSender(api, chatID)
 
@@ -39,6 +51,6 @@ func main() {
 	r := chi.NewRouter()
 	delivery.RegisterRoutes(r, h)
 
-	log.Println("avito webhook listening on :8080")
+	log.Println("Listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
