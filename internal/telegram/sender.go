@@ -7,29 +7,24 @@ import (
 )
 
 type Sender struct {
-	api    *tgbotapi.BotAPI
-	chatID int64
+	api     *tgbotapi.BotAPI
+	chatIDs []int64
 }
 
-func NewSender(api *tgbotapi.BotAPI, chatID int64) *Sender {
-	log.Println("TELEGRAM SENDER INIT. CHAT ID:", chatID)
+func NewSender(api *tgbotapi.BotAPI, chatIDs []int64) *Sender {
 	return &Sender{
-		api:    api,
-		chatID: chatID,
+		api:     api,
+		chatIDs: chatIDs,
 	}
 }
 
 func (s *Sender) Send(text string) error {
-	log.Println("TG SEND → chat:", s.chatID)
-	log.Println("TG TEXT:", text)
-
-	msg := tgbotapi.NewMessage(s.chatID, text)
-	res, err := s.api.Send(msg)
-	if err != nil {
-		log.Println("TG ERROR:", err)
-		return err
+	for _, id := range s.chatIDs {
+		log.Println("TG SEND → chat:", id)
+		msg := tgbotapi.NewMessage(id, text)
+		if _, err := s.api.Send(msg); err != nil {
+			log.Println("TG ERROR:", err)
+		}
 	}
-
-	log.Println("TG OK. MessageID:", res.MessageID)
 	return nil
 }

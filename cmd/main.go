@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -17,21 +16,15 @@ import (
 func main() {
 	log.Println("=== AVITO APP START ===")
 
-	// --- env ---
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
-	chatIDStr := os.Getenv("TELEGRAM_CHAT_ID")
 	port := os.Getenv("PORT")
 
+	chatIDs := []int64{20461089, 6789440333}
+
 	log.Println("PORT:", port)
-	log.Println("TELEGRAM_CHAT_ID:", chatIDStr)
+	log.Println("CHAT IDS:", chatIDs)
 	if len(token) > 10 {
 		log.Println("TELEGRAM_TOKEN_PREFIX:", token[:10])
-	}
-
-	// --- telegram ---
-	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
-	if err != nil {
-		log.Fatal("invalid TELEGRAM_CHAT_ID")
 	}
 
 	api, err := tgbotapi.NewBotAPI(token)
@@ -41,12 +34,10 @@ func main() {
 
 	log.Println("Telegram bot authorized as:", api.Self.UserName)
 
-	tgSender := telegram.NewSender(api, chatID)
+	tgSender := telegram.NewSender(api, chatIDs)
 
-	// --- domain ---
 	svc := domain.NewService(tgSender)
 
-	// --- http ---
 	h := delivery.NewWebhookHandler(svc)
 	r := chi.NewRouter()
 	delivery.RegisterRoutes(r, h)
