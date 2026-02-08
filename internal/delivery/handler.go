@@ -20,31 +20,41 @@ func NewWebhookHandler(svc *domain.Service) *WebhookHandler {
 func (h *WebhookHandler) HandleAvitoWebhook(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	log.Println("=== WEBHOOK HIT ===")
-	log.Println("METHOD:", r.Method, "PATH:", r.URL.Path)
-	log.Println("REMOTE:", r.RemoteAddr)
+	body, _ := io.ReadAll(r.Body)
+	log.Println("=== AVITO WEBHOOK RAW ===")
+	log.Println(string(body))
 
-	bodyBytes, _ := io.ReadAll(r.Body)
-	log.Println("RAW BODY:", string(bodyBytes))
-
-	var payload domain.AvitoWebhook
-
-	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
-		log.Println("DECODE ERROR:", err)
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
-	if payload.Type != "message_new" {
-		log.Println("SKIP EVENT TYPE:", payload.Type)
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		log.Println("JSON ERROR:", err)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	text := payload.Payload.Message.Text
-	log.Println("TEXT:", text)
+	text := extractText(raw)
+	log.Println("EXTRACTED TEXT:", text)
 
-	h.svc.ProcessMessage(r.Context(), text)
+	if text != "" {
+		h.svc.ProcessMessage(r.Context(), text)
+	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func extractText(m map[string]any) string {
+	// payload.message.content.text
+	if p, ok := m["payload"].(map[string]any); ok {
+		if msg, ok := p["message"].(map[string]any); ok {
+			if content, ok := msg["content"].(map[string]any); ok {
+				if t, ok := content["text"].(string); ok {
+					return t
+				}
+			}
+			// fallback: payload.message.text
+			if t, ok := msg["text"].(string); ok {
+				return t
+			}
+		}
+	}
+	return ""
 }

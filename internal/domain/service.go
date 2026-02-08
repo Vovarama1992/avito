@@ -18,14 +18,11 @@ func NewService(tg TelegramSender) *Service {
 }
 
 func (s *Service) ProcessMessage(ctx context.Context, text string) {
-	log.Println("PROCESS MESSAGE TEXT:", text)
+	log.Println("SERVICE GOT TEXT:", text)
 
 	if text == "" {
-		log.Println("EMPTY TEXT — SKIP")
 		return
 	}
-
-	log.Println("→ SENDING TO TELEGRAM")
 
 	if err := s.tg.Send(text); err != nil {
 		log.Println("TG SEND ERROR:", err)
