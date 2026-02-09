@@ -23,12 +23,6 @@ const accountAlias = "Самара Jaecoo"
 func (s *Service) ProcessWebhook(ctx context.Context, evt AvitoWebhook) {
 	v := evt.Payload.Value
 
-	// системное сообщение от чат-бота Авито: flow_id заполнен
-	if v.FlowID == "" {
-		log.Println("SKIP: not system (empty flow_id)")
-		return
-	}
-
 	text := v.Content.Text
 	if text == "" {
 		log.Println("SKIP: empty text")
@@ -36,6 +30,11 @@ func (s *Service) ProcessWebhook(ctx context.Context, evt AvitoWebhook) {
 	}
 
 	out := fmt.Sprintf("Аккаунт %s:\n%s", accountAlias, text)
+
+	// мягкая пометка, НИЧЕГО не фильтруем
+	if v.FlowID != "" {
+		out += "\n\n(вероятно системное)"
+	}
 
 	log.Println("→ SENDING TO TELEGRAM")
 	if err := s.tg.Send(out); err != nil {
