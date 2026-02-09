@@ -24,14 +24,17 @@ func (h *WebhookHandler) HandleAvitoWebhook(w http.ResponseWriter, r *http.Reque
 	log.Println("=== AVITO WEBHOOK RAW ===")
 	log.Println(string(body))
 
-	var ev domain.AvitoEvent
-	if err := json.Unmarshal(body, &ev); err != nil {
-		log.Println("JSON ERROR:", err)
-		w.WriteHeader(http.StatusOK)
+	var evt domain.AvitoWebhook
+	if err := json.Unmarshal(body, &evt); err != nil {
+		log.Println("DECODE ERROR:", err)
+		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
 
-	h.svc.ProcessEvent(r.Context(), ev)
+	log.Println("PAYLOAD TYPE:", evt.Payload.Type) // обычно "message"
+	log.Println("MSG TYPE:", evt.Payload.Value.Type)
+
+	h.svc.ProcessWebhook(r.Context(), evt)
 
 	w.WriteHeader(http.StatusOK)
 }
