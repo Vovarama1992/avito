@@ -1,35 +1,48 @@
-.PHONY: refresh full-refresh build up down logs app-logs commit
+.PHONY: refresh full-refresh build up down logs app-logs status restart commit matrix-env
 
-APP=avito_monitor_app
+APP=avito-monitor
+SERVICE=avito-monitor
 
 refresh:
 	git pull origin main
-	docker compose build app
-	docker compose stop app
-	docker compose up -d --no-deps app
-	docker compose logs -f app
+	/usr/local/go/bin/go mod download
+	/usr/local/go/bin/go build -o $(APP) ./cmd
+	systemctl restart $(SERVICE)
+	journalctl -u $(SERVICE) -f
 
 full-refresh:
 	git pull origin main
-	docker compose down
-	docker compose build --no-cache
-	docker compose up -d
-	docker compose logs -f app
+	/usr/local/go/bin/go clean -cache
+	/usr/local/go/bin/go mod download
+	/usr/local/go/bin/go build -o $(APP) ./cmd
+	systemctl restart $(SERVICE)
+	journalctl -u $(SERVICE) -f
 
 build:
-	docker compose build
+	/usr/local/go/bin/go mod download
+	/usr/local/go/bin/go build -o $(APP) ./cmd
 
 up:
-	docker compose up -d
+	systemctl enable $(SERVICE)
+	systemctl start $(SERVICE)
 
 down:
-	docker compose down
+	systemctl stop $(SERVICE)
+
+restart:
+	systemctl restart $(SERVICE)
+
+status:
+	systemctl status $(SERVICE)
 
 logs:
-	docker compose logs -f
+	journalctl -u $(SERVICE) -f
 
 app-logs:
-	docker logs --tail=100 -f $(APP)
+	journalctl -u $(SERVICE) -n 100 -f
+
+matrix-env:
+	nano .env
 
 commit:
 	git add .
