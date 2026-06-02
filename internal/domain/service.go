@@ -6,16 +6,16 @@ import (
 	"log"
 )
 
-type TelegramSender interface {
+type Sender interface {
 	Send(text string) error
 }
 
 type Service struct {
-	tg TelegramSender
+	sender Sender
 }
 
-func NewService(tg TelegramSender) *Service {
-	return &Service{tg: tg}
+func NewService(sender Sender) *Service {
+	return &Service{sender: sender}
 }
 
 const accountAlias = "Самара Jaecoo"
@@ -31,15 +31,14 @@ func (s *Service) ProcessWebhook(ctx context.Context, evt AvitoWebhook) {
 
 	out := fmt.Sprintf("Аккаунт %s:\n%s", accountAlias, text)
 
-	// мягкая пометка, НИЧЕГО не фильтруем
 	if v.FlowID != "" {
 		out += "\n\n(вероятно системное)"
 	}
 
-	log.Println("→ SENDING TO TELEGRAM")
-	if err := s.tg.Send(out); err != nil {
-		log.Println("TG SEND ERROR:", err)
+	log.Println("→ SENDING TO MATRIX")
+	if err := s.sender.Send(out); err != nil {
+		log.Println("MATRIX SEND ERROR:", err)
 	} else {
-		log.Println("TG SEND OK")
+		log.Println("MATRIX SEND OK")
 	}
 }

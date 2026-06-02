@@ -6,42 +6,52 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/Vovarama1992/avito/internal/delivery"
 	"github.com/Vovarama1992/avito/internal/domain"
-	"github.com/Vovarama1992/avito/internal/telegram"
+	"github.com/Vovarama1992/avito/internal/matrix"
 )
 
 func main() {
 	log.Println("=== AVITO APP START ===")
 
-	token := os.Getenv("TELEGRAM_BOT_TOKEN")
 	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 
-	chatIDs := []int64{20461089, 6789440333}
+	matrixHomeserver := os.Getenv("MATRIX_HOMESERVER")
+	matrixAccessToken := os.Getenv("MATRIX_ACCESS_TOKEN")
+	matrixRoomID := os.Getenv("MATRIX_ROOM_ID")
+
+	if matrixHomeserver == "" {
+		log.Fatal("MATRIX_HOMESERVER is required")
+	}
+	if matrixAccessToken == "" {
+		log.Fatal("MATRIX_ACCESS_TOKEN is required")
+	}
+	if matrixRoomID == "" {
+		log.Fatal("MATRIX_ROOM_ID is required")
+	}
 
 	log.Println("PORT:", port)
-	log.Println("CHAT IDS:", chatIDs)
-	if len(token) > 10 {
-		log.Println("TELEGRAM_TOKEN_PREFIX:", token[:10])
-	}
+	log.Println("MATRIX_HOMESERVER:", matrixHomeserver)
+	log.Println("MATRIX_ROOM_ID:", matrixRoomID)
 
-	api, err := tgbotapi.NewBotAPI(token)
-	if err != nil {
-		log.Fatal(err)
-	}
+	matrixSender := matrix.NewSender(
+		matrixHomeserver,
+		matrixAccessToken,
+		matrixRoomID,
+	)
 
-	log.Println("Telegram bot authorized as:", api.Self.UserName)
-
-	tgSender := telegram.NewSender(api, chatIDs)
-
-	svc := domain.NewService(tgSender)
+	svc := domain.NewService(matrixSender)
 
 	h := delivery.NewWebhookHandler(svc)
 	r := chi.NewRouter()
 	delivery.RegisterRoutes(r, h)
 
-	log.Println("Listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	addr := ":" + port
+	log.Println("Listening on", addr)
+
+	log.Fatal(http.ListenAndServe(addr, r))
 }
