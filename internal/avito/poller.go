@@ -7,7 +7,7 @@ import (
 )
 
 type SystemMessageHandler interface {
-	ProcessSystemMessage(ctx context.Context, text string)
+	ProcessSystemMessage(ctx context.Context, source, accountID, chatID, text string)
 }
 
 type Poller struct {
@@ -76,7 +76,7 @@ func (p *Poller) poll(ctx context.Context) {
 		}
 
 		newCount++
-		p.handler.ProcessSystemMessage(ctx, msg.Content.Text)
+		p.handler.ProcessSystemMessage(ctx, "polling: Проверка транспорта", p.accountID, p.chatID, msg.Content.Text)
 	}
 
 	if !p.ready {
