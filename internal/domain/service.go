@@ -12,13 +12,15 @@ type Sender interface {
 
 type Service struct {
 	sender Sender
+	alias  string
 }
 
-func NewService(sender Sender) *Service {
-	return &Service{sender: sender}
+func NewService(sender Sender, alias string) *Service {
+	return &Service{
+		sender: sender,
+		alias:  alias,
+	}
 }
-
-const accountAlias = "Самара Jaecoo"
 
 func (s *Service) ProcessWebhook(ctx context.Context, evt AvitoWebhook) {
 	v := evt.Payload.Value
@@ -29,13 +31,29 @@ func (s *Service) ProcessWebhook(ctx context.Context, evt AvitoWebhook) {
 		return
 	}
 
-	out := fmt.Sprintf("Аккаунт %s:\n%s", accountAlias, text)
+	out := fmt.Sprintf("Аккаунт %s:\n%s", s.alias, text)
 
 	if v.FlowID != "" {
 		out += "\n\n(вероятно системное)"
 	}
 
 	log.Println("→ SENDING TO MATRIX")
+	if err := s.sender.Send(out); err != nil {
+		log.Println("MATRIX SEND ERROR:", err)
+	} else {
+		log.Println("MATRIX SEND OK")
+	}
+}
+
+func (s *Service) ProcessSystemMessage(ctx context.Context, text string) {
+	if text == "" {
+		log.Println("SKIP: empty system text")
+		return
+	}
+
+	out := fmt.Sprintf("Аккаунт %s:\n%s", s.alias, text)
+
+	log.Println("→ SENDING POLLED SYSTEM MESSAGE TO MATRIX")
 	if err := s.sender.Send(out); err != nil {
 		log.Println("MATRIX SEND ERROR:", err)
 	} else {

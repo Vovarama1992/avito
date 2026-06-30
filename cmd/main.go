@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Vovarama1992/avito/internal/avito"
 	"github.com/Vovarama1992/avito/internal/delivery"
 	"github.com/Vovarama1992/avito/internal/domain"
 	"github.com/Vovarama1992/avito/internal/matrix"
@@ -18,6 +22,10 @@ func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
+	}
+	accountAlias := os.Getenv("ACCOUNT_ALIAS")
+	if accountAlias == "" {
+		accountAlias = "Самара Jaecoo"
 	}
 
 	matrixHomeserver := os.Getenv("MATRIX_HOMESERVER")
@@ -37,6 +45,7 @@ func main() {
 	log.Println("PORT:", port)
 	log.Println("MATRIX_HOMESERVER:", matrixHomeserver)
 	log.Println("MATRIX_ROOM_ID:", matrixRoomID)
+	log.Println("ACCOUNT_ALIAS:", accountAlias)
 
 	matrixSender := matrix.NewSender(
 		matrixHomeserver,
@@ -44,7 +53,8 @@ func main() {
 		matrixRoomID,
 	)
 
-	svc := domain.NewService(matrixSender)
+	svc := domain.NewService(matrixSender, accountAlias)
+	startAvitoPoller(svc)
 
 	h := delivery.NewWebhookHandler(svc)
 	r := chi.NewRouter()
@@ -54,4 +64,34 @@ func main() {
 	log.Println("Listening on", addr)
 
 	log.Fatal(http.ListenAndServe(addr, r))
+}
+
+func startAvitoPoller(svc *domain.Service) {
+	accessToken := os.Getenv("AVITO_ACCESS_TOKEN")
+	accountID := os.Getenv("AVITO_ACCOUNT_ID")
+	chatID := os.Getenv("AVITO_CHAT_ID")
+
+	if accessToken == "" || accountID == "" || chatID == "" {
+		log.Println("AVITO POLLER DISABLED: AVITO_ACCESS_TOKEN, AVITO_ACCOUNT_ID or AVITO_CHAT_ID is empty")
+		return
+	}
+
+	interval := 30 * time.Second
+	if raw := os.Getenv("POLL_INTERVAL_SECONDS"); raw != "" {
+		seconds, err := strconv.Atoi(raw)
+		if err != nil || seconds <= 0 {
+			log.Println("INVALID POLL_INTERVAL_SECONDS, using default 30")
+		} else {
+			interval = time.Duration(seconds) * time.Second
+		}
+	}
+
+	log.Println("AVITO POLLER ENABLED")
+	log.Println("AVITO_ACCOUNT_ID:", accountID)
+	log.Println("AVITO_CHAT_ID:", chatID)
+	log.Println("POLL_INTERVAL:", interval)
+
+	client := avito.NewClient(accessToken)
+	poller := avito.NewPoller(client, svc, accountID, chatID, interval)
+	go poller.Run(context.Background())
 }
