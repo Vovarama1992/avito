@@ -25,12 +25,18 @@ func NewService(sender Sender, alias string, webhookForwardEnabled bool) *Servic
 }
 
 func (s *Service) ProcessWebhook(ctx context.Context, evt AvitoWebhook) {
+	v := evt.Payload.Value
+
 	if !s.webhookForwardEnabled {
-		log.Println("WEBHOOK FORWARD DISABLED: skip matrix send")
+		log.Printf(
+			"WEBHOOK RECEIVED BUT NOT SENT: reason=webhook_forward_disabled id=%s chat_id=%s msg_type=%s text=%q",
+			v.ID,
+			v.ChatID,
+			v.Type,
+			preview(v.Content.Text),
+		)
 		return
 	}
-
-	v := evt.Payload.Value
 
 	text := v.Content.Text
 	if text == "" {
@@ -50,6 +56,14 @@ func (s *Service) ProcessWebhook(ctx context.Context, evt AvitoWebhook) {
 	} else {
 		log.Println("MATRIX SEND OK")
 	}
+}
+
+func preview(text string) string {
+	const limit = 160
+	if len(text) <= limit {
+		return text
+	}
+	return text[:limit] + "..."
 }
 
 func (s *Service) ProcessSystemMessage(ctx context.Context, source, accountID, chatID, text string) {

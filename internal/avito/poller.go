@@ -77,7 +77,11 @@ func (p *Poller) poll(ctx context.Context) {
 		}
 
 		p.seen[msg.ID] = struct{}{}
-		if !p.ready || msg.Type != "system" {
+		if !p.ready {
+			continue
+		}
+		if msg.Type != "system" {
+			log.Printf("AVITO POLLER RECEIVED BUT NOT SENT: reason=not_system id=%s type=%s direction=%s", msg.ID, msg.Type, msg.Direction)
 			continue
 		}
 
