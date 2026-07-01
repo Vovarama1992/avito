@@ -46,6 +46,7 @@ func main() {
 	log.Println("MATRIX_HOMESERVER:", matrixHomeserver)
 	log.Println("MATRIX_ROOM_ID:", matrixRoomID)
 	log.Println("ACCOUNT_ALIAS:", accountAlias)
+	log.Println("WEBHOOK_FORWARD_ENABLED:", webhookForwardEnabled())
 
 	matrixSender := matrix.NewSender(
 		matrixHomeserver,
@@ -53,7 +54,7 @@ func main() {
 		matrixRoomID,
 	)
 
-	svc := domain.NewService(matrixSender, accountAlias)
+	svc := domain.NewService(matrixSender, accountAlias, webhookForwardEnabled())
 	startAvitoPoller(svc)
 
 	h := delivery.NewWebhookHandler(svc)
@@ -64,6 +65,11 @@ func main() {
 	log.Println("Listening on", addr)
 
 	log.Fatal(http.ListenAndServe(addr, r))
+}
+
+func webhookForwardEnabled() bool {
+	raw := os.Getenv("WEBHOOK_FORWARD_ENABLED")
+	return raw == "" || raw == "true" || raw == "1" || raw == "yes"
 }
 
 func startAvitoPoller(svc *domain.Service) {

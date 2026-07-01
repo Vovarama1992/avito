@@ -11,18 +11,25 @@ type Sender interface {
 }
 
 type Service struct {
-	sender Sender
-	alias  string
+	sender                Sender
+	alias                 string
+	webhookForwardEnabled bool
 }
 
-func NewService(sender Sender, alias string) *Service {
+func NewService(sender Sender, alias string, webhookForwardEnabled bool) *Service {
 	return &Service{
-		sender: sender,
-		alias:  alias,
+		sender:                sender,
+		alias:                 alias,
+		webhookForwardEnabled: webhookForwardEnabled,
 	}
 }
 
 func (s *Service) ProcessWebhook(ctx context.Context, evt AvitoWebhook) {
+	if !s.webhookForwardEnabled {
+		log.Println("WEBHOOK FORWARD DISABLED: skip matrix send")
+		return
+	}
+
 	v := evt.Payload.Value
 
 	text := v.Content.Text
