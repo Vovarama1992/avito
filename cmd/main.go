@@ -74,11 +74,18 @@ func webhookForwardEnabled() bool {
 
 func startAvitoPoller(svc *domain.Service) {
 	accessToken := os.Getenv("AVITO_ACCESS_TOKEN")
+	clientID := os.Getenv("AVITO_CLIENT_ID")
+	clientSecret := os.Getenv("AVITO_CLIENT_SECRET")
 	accountID := os.Getenv("AVITO_ACCOUNT_ID")
 	chatID := os.Getenv("AVITO_CHAT_ID")
 
-	if accessToken == "" || accountID == "" || chatID == "" {
-		log.Println("AVITO POLLER DISABLED: AVITO_ACCESS_TOKEN, AVITO_ACCOUNT_ID or AVITO_CHAT_ID is empty")
+	if accessToken == "" && (clientID == "" || clientSecret == "") {
+		log.Println("AVITO POLLER DISABLED: AVITO_ACCESS_TOKEN or AVITO_CLIENT_ID/AVITO_CLIENT_SECRET is required")
+		return
+	}
+
+	if accountID == "" || chatID == "" {
+		log.Println("AVITO POLLER DISABLED: AVITO_ACCOUNT_ID or AVITO_CHAT_ID is empty")
 		return
 	}
 
@@ -93,11 +100,12 @@ func startAvitoPoller(svc *domain.Service) {
 	}
 
 	log.Println("AVITO POLLER ENABLED")
+	log.Println("AVITO_AUTO_TOKEN_REFRESH:", clientID != "" && clientSecret != "")
 	log.Println("AVITO_ACCOUNT_ID:", accountID)
 	log.Println("AVITO_CHAT_ID:", chatID)
 	log.Println("POLL_INTERVAL:", interval)
 
-	client := avito.NewClient(accessToken)
+	client := avito.NewClient(accessToken, clientID, clientSecret)
 	poller := avito.NewPoller(client, svc, accountID, chatID, interval)
 	go poller.Run(context.Background())
 }
