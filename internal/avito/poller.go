@@ -2,6 +2,7 @@ package avito
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 )
@@ -18,6 +19,7 @@ type Poller struct {
 	interval  time.Duration
 	seen      map[string]struct{}
 	ready     bool
+	authAlert bool
 }
 
 func NewPoller(client *Client, handler SystemMessageHandler, accountID, chatID string, interval time.Duration) *Poller {
@@ -53,9 +55,13 @@ func (p *Poller) poll(ctx context.Context) {
 	messages, err := p.client.GetMessages(ctx, p.accountID, p.chatID)
 	if err != nil {
 		log.Println("AVITO POLL ERROR:", err)
+		if errors.Is(err, ErrUnauthorized) {
+			p.sendAuthAlert(ctx)
+		}
 		return
 	}
 
+	p.authAlert = false
 	systemCount := 0
 	newCount := 0
 
@@ -86,4 +92,19 @@ func (p *Poller) poll(ctx context.Context) {
 	}
 
 	log.Printf("AVITO POLLER OK: messages=%d system=%d new_system=%d", len(messages), systemCount, newCount)
+}
+
+func (p *Poller) sendAuthAlert(ctx context.Context) {
+	if p.authAlert {
+		return
+	}
+	p.authAlert = true
+
+	p.handler.ProcessSystemMessage(
+		ctx,
+		"polling: ошибка Avito token",
+		p.accountID,
+		p.chatID,
+		"Avito access token не работает или протух. Нужно обновить AVITO_ACCESS_TOKEN, иначе сообщения из \"Проверки транспорта\" не будут приходить.",
+	)
 }

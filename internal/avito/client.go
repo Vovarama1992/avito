@@ -3,11 +3,14 @@ package avito
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 )
+
+var ErrUnauthorized = errors.New("avito unauthorized")
 
 type Client struct {
 	baseURL     string
@@ -64,6 +67,10 @@ func (c *Client) GetMessages(ctx context.Context, accountID, chatID string) ([]M
 		return nil, fmt.Errorf("avito get messages: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return nil, fmt.Errorf("%w: %s", ErrUnauthorized, resp.Status)
+	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("avito get messages bad status: %s", resp.Status)
