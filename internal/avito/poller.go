@@ -13,15 +13,17 @@ type SystemMessageHandler interface {
 }
 
 type Poller struct {
-	client    *Client
-	handler   SystemMessageHandler
-	accountID string
-	chatID    string
-	interval  time.Duration
-	startedAt int64
-	seen      map[string]struct{}
-	ready     bool
-	authAlert bool
+	client            *Client
+	handler           SystemMessageHandler
+	accountID         string
+	chatID            string
+	interval          time.Duration
+	startedAt         int64
+	seen              map[string]struct{}
+	ready             bool
+	authAlert         bool
+	consecutiveErrors int
+	outageAlert       bool
 }
 
 func NewPoller(client *Client, handler SystemMessageHandler, accountID, chatID string, interval time.Duration) *Poller {
@@ -57,13 +59,20 @@ func (p *Poller) Run(ctx context.Context) {
 func (p *Poller) poll(ctx context.Context) {
 	messages, err := p.client.GetMessages(ctx, p.accountID, p.chatID)
 	if err != nil {
+		p.consecutiveErrors++
 		audit.Logf("AVITO POLL ERROR: account_id=%s chat_id=%s err=%v", p.accountID, p.chatID, err)
 		if errors.Is(err, ErrUnauthorized) {
 			p.sendAuthAlert(ctx)
 		}
+		p.sendOutageAlert(ctx, err)
 		return
 	}
 
+	if p.outageAlert {
+		p.sendRecoveryAlert(ctx)
+	}
+	p.consecutiveErrors = 0
+	p.outageAlert = false
 	p.authAlert = false
 	systemCount := 0
 	newCount := 0
@@ -117,6 +126,34 @@ func (p *Poller) sendAuthAlert(ctx context.Context) {
 		p.accountID,
 		p.chatID,
 		"Avito access token не работает или протух. Нужно обновить AVITO_ACCESS_TOKEN, иначе сообщения из \"Проверки транспорта\" не будут приходить.",
+	)
+}
+
+func (p *Poller) sendOutageAlert(ctx context.Context, err error) {
+	const threshold = 5
+	if p.outageAlert || p.consecutiveErrors < threshold {
+		return
+	}
+	p.outageAlert = true
+
+	audit.Logf("AVITO API OUTAGE ALERT SENT: account_id=%s chat_id=%s consecutive_errors=%d", p.accountID, p.chatID, p.consecutiveErrors)
+	p.handler.ProcessSystemMessage(
+		ctx,
+		"polling: ошибка Avito API",
+		p.accountID,
+		p.chatID,
+		"Авария polling: Avito API не отвечает 5 запросов подряд. Сообщения из \"Проверки транспорта\" временно не читаются. Последняя ошибка: "+err.Error(),
+	)
+}
+
+func (p *Poller) sendRecoveryAlert(ctx context.Context) {
+	audit.Logf("AVITO API RECOVERY ALERT SENT: account_id=%s chat_id=%s", p.accountID, p.chatID)
+	p.handler.ProcessSystemMessage(
+		ctx,
+		"polling: Avito API восстановился",
+		p.accountID,
+		p.chatID,
+		"Polling снова работает: Avito API ответил, сообщения из \"Проверки транспорта\" снова читаются.",
 	)
 }
 
