@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/Vovarama1992/avito/internal/audit"
 )
 
 var ErrUnauthorized = errors.New("avito unauthorized")
@@ -112,6 +114,7 @@ func (c *Client) RefreshToken(ctx context.Context) error {
 	}
 
 	c.accessToken = out.AccessToken
+	audit.Logf("AVITO TOKEN REFRESH OK")
 	return nil
 }
 

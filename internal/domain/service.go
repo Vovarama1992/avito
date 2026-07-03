@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+
+	"github.com/Vovarama1992/avito/internal/audit"
 )
 
 type Sender interface {
@@ -28,7 +30,7 @@ func (s *Service) ProcessWebhook(ctx context.Context, evt AvitoWebhook) {
 	v := evt.Payload.Value
 
 	if !s.webhookForwardEnabled {
-		log.Printf(
+		audit.Logf(
 			"WEBHOOK RECEIVED BUT NOT SENT: reason=webhook_forward_disabled id=%s chat_id=%s msg_type=%s text=%q",
 			v.ID,
 			v.ChatID,
@@ -83,8 +85,8 @@ func (s *Service) ProcessSystemMessage(ctx context.Context, source, accountID, c
 
 	log.Println("→ SENDING POLLED SYSTEM MESSAGE TO MATRIX")
 	if err := s.sender.Send(out); err != nil {
-		log.Println("MATRIX SEND ERROR:", err)
+		audit.Logf("MATRIX SEND ERROR: source=%s account_id=%s chat_id=%s err=%v", source, accountID, chatID, err)
 	} else {
-		log.Println("MATRIX SEND OK")
+		audit.Logf("MATRIX SEND OK: source=%s account_id=%s chat_id=%s", source, accountID, chatID)
 	}
 }

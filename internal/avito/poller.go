@@ -3,8 +3,9 @@ package avito
 import (
 	"context"
 	"errors"
-	"log"
 	"time"
+
+	"github.com/Vovarama1992/avito/internal/audit"
 )
 
 type SystemMessageHandler interface {
@@ -34,7 +35,7 @@ func NewPoller(client *Client, handler SystemMessageHandler, accountID, chatID s
 }
 
 func (p *Poller) Run(ctx context.Context) {
-	log.Println("AVITO POLLER STARTED")
+	audit.Logf("AVITO POLLER STARTED")
 	p.poll(ctx)
 
 	ticker := time.NewTicker(p.interval)
@@ -43,7 +44,7 @@ func (p *Poller) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("AVITO POLLER STOPPED")
+			audit.Logf("AVITO POLLER STOPPED")
 			return
 		case <-ticker.C:
 			p.poll(ctx)
@@ -54,7 +55,7 @@ func (p *Poller) Run(ctx context.Context) {
 func (p *Poller) poll(ctx context.Context) {
 	messages, err := p.client.GetMessages(ctx, p.accountID, p.chatID)
 	if err != nil {
-		log.Println("AVITO POLL ERROR:", err)
+		audit.Logf("AVITO POLL ERROR: account_id=%s chat_id=%s err=%v", p.accountID, p.chatID, err)
 		if errors.Is(err, ErrUnauthorized) {
 			p.sendAuthAlert(ctx)
 		}
@@ -81,21 +82,22 @@ func (p *Poller) poll(ctx context.Context) {
 			continue
 		}
 		if msg.Type != "system" {
-			log.Printf("AVITO POLLER RECEIVED BUT NOT SENT: reason=not_system id=%s type=%s direction=%s", msg.ID, msg.Type, msg.Direction)
+			audit.Logf("AVITO POLLER RECEIVED BUT NOT SENT: reason=not_system id=%s type=%s direction=%s account_id=%s chat_id=%s", msg.ID, msg.Type, msg.Direction, p.accountID, p.chatID)
 			continue
 		}
 
 		newCount++
+		audit.Logf("AVITO POLLER NEW SYSTEM MESSAGE: id=%s direction=%s account_id=%s chat_id=%s text=%q", msg.ID, msg.Direction, p.accountID, p.chatID, preview(msg.Content.Text))
 		p.handler.ProcessSystemMessage(ctx, "polling: Проверка транспорта", p.accountID, p.chatID, msg.Content.Text)
 	}
 
 	if !p.ready {
 		p.ready = true
-		log.Printf("AVITO POLLER BASELINE LOADED: messages=%d system=%d", len(messages), systemCount)
+		audit.Logf("AVITO POLLER BASELINE LOADED: account_id=%s chat_id=%s messages=%d system=%d", p.accountID, p.chatID, len(messages), systemCount)
 		return
 	}
 
-	log.Printf("AVITO POLLER OK: messages=%d system=%d new_system=%d", len(messages), systemCount, newCount)
+	audit.Logf("AVITO POLLER OK: account_id=%s chat_id=%s messages=%d system=%d new_system=%d", p.accountID, p.chatID, len(messages), systemCount, newCount)
 }
 
 func (p *Poller) sendAuthAlert(ctx context.Context) {
@@ -103,6 +105,7 @@ func (p *Poller) sendAuthAlert(ctx context.Context) {
 		return
 	}
 	p.authAlert = true
+	audit.Logf("AVITO TOKEN ALERT SENT: account_id=%s chat_id=%s", p.accountID, p.chatID)
 
 	p.handler.ProcessSystemMessage(
 		ctx,
@@ -111,4 +114,12 @@ func (p *Poller) sendAuthAlert(ctx context.Context) {
 		p.chatID,
 		"Avito access token не работает или протух. Нужно обновить AVITO_ACCESS_TOKEN, иначе сообщения из \"Проверки транспорта\" не будут приходить.",
 	)
+}
+
+func preview(text string) string {
+	const limit = 220
+	if len(text) <= limit {
+		return text
+	}
+	return text[:limit] + "..."
 }
