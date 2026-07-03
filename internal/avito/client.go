@@ -65,9 +65,13 @@ func (c *Client) GetMessages(ctx context.Context, accountID, chatID string) ([]M
 	}
 
 	messages, err := c.getMessages(ctx, accountID, chatID)
-	if errors.Is(err, ErrUnauthorized) && c.canRefreshToken() {
+	if err != nil && c.canRefreshToken() {
+		audit.Logf("AVITO GET MESSAGES ERROR: refreshing token before retry err=%v", err)
 		if refreshErr := c.RefreshToken(ctx); refreshErr != nil {
-			return nil, refreshErr
+			if errors.Is(err, ErrUnauthorized) {
+				return nil, refreshErr
+			}
+			return nil, err
 		}
 		return c.getMessages(ctx, accountID, chatID)
 	}
