@@ -18,6 +18,7 @@ type Poller struct {
 	accountID string
 	chatID    string
 	interval  time.Duration
+	startedAt int64
 	seen      map[string]struct{}
 	ready     bool
 	authAlert bool
@@ -30,6 +31,7 @@ func NewPoller(client *Client, handler SystemMessageHandler, accountID, chatID s
 		accountID: accountID,
 		chatID:    chatID,
 		interval:  interval,
+		startedAt: time.Now().Unix(),
 		seen:      make(map[string]struct{}),
 	}
 }
@@ -78,11 +80,13 @@ func (p *Poller) poll(ctx context.Context) {
 		}
 
 		p.seen[msg.ID] = struct{}{}
-		if !p.ready {
+		if msg.Type != "system" {
+			if p.ready {
+				audit.Logf("AVITO POLLER RECEIVED BUT NOT SENT: reason=not_system id=%s type=%s direction=%s account_id=%s chat_id=%s", msg.ID, msg.Type, msg.Direction, p.accountID, p.chatID)
+			}
 			continue
 		}
-		if msg.Type != "system" {
-			audit.Logf("AVITO POLLER RECEIVED BUT NOT SENT: reason=not_system id=%s type=%s direction=%s account_id=%s chat_id=%s", msg.ID, msg.Type, msg.Direction, p.accountID, p.chatID)
+		if !p.ready && msg.Created < p.startedAt {
 			continue
 		}
 
@@ -93,7 +97,7 @@ func (p *Poller) poll(ctx context.Context) {
 
 	if !p.ready {
 		p.ready = true
-		audit.Logf("AVITO POLLER BASELINE LOADED: account_id=%s chat_id=%s messages=%d system=%d", p.accountID, p.chatID, len(messages), systemCount)
+		audit.Logf("AVITO POLLER BASELINE LOADED: account_id=%s chat_id=%s messages=%d system=%d new_system_sent=%d", p.accountID, p.chatID, len(messages), systemCount, newCount)
 		return
 	}
 
