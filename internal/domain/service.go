@@ -68,15 +68,19 @@ func preview(text string) string {
 	return text[:limit] + "..."
 }
 
-func (s *Service) ProcessSystemMessage(ctx context.Context, source, accountID, chatID, text string) {
+func (s *Service) ProcessSystemMessage(ctx context.Context, alias, source, accountID, chatID, text string) {
 	if text == "" {
 		log.Println("SKIP: empty system text")
 		return
 	}
 
+	if alias == "" {
+		alias = s.alias
+	}
+
 	out := fmt.Sprintf(
 		"Аккаунт %s:\nИсточник: %s\naccount_id: %s\nchat_id: %s\n%s",
-		s.alias,
+		alias,
 		source,
 		accountID,
 		chatID,

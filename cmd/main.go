@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -55,7 +56,7 @@ func main() {
 	)
 
 	svc := domain.NewService(matrixSender, accountAlias, webhookForwardEnabled())
-	startAvitoPoller(svc)
+	startAvitoPoller(svc, accountAlias)
 
 	h := delivery.NewWebhookHandler(svc)
 	r := chi.NewRouter()
@@ -72,20 +73,20 @@ func webhookForwardEnabled() bool {
 	return raw == "" || raw == "true" || raw == "1" || raw == "yes"
 }
 
-func startAvitoPoller(svc *domain.Service) {
+func startAvitoPoller(svc *domain.Service, accountAlias string) {
+	configPath := os.Getenv("AVITO_SOURCES_CONFIG")
 	accessToken := os.Getenv("AVITO_ACCESS_TOKEN")
 	clientID := os.Getenv("AVITO_CLIENT_ID")
 	clientSecret := os.Getenv("AVITO_CLIENT_SECRET")
 	accountID := os.Getenv("AVITO_ACCOUNT_ID")
 	chatID := os.Getenv("AVITO_CHAT_ID")
 
-	if accessToken == "" && (clientID == "" || clientSecret == "") {
-		log.Println("AVITO POLLER DISABLED: AVITO_ACCESS_TOKEN or AVITO_CLIENT_ID/AVITO_CLIENT_SECRET is required")
-		return
+	sources, err := loadPollSources(configPath, accountAlias, accessToken, clientID, clientSecret, accountID, chatID)
+	if err != nil {
+		log.Fatal("AVITO SOURCES CONFIG ERROR:", err)
 	}
-
-	if accountID == "" || chatID == "" {
-		log.Println("AVITO POLLER DISABLED: AVITO_ACCOUNT_ID or AVITO_CHAT_ID is empty")
+	if len(sources) == 0 {
+		log.Println("AVITO POLLER DISABLED: no enabled Avito sources")
 		return
 	}
 
@@ -100,12 +101,47 @@ func startAvitoPoller(svc *domain.Service) {
 	}
 
 	log.Println("AVITO POLLER ENABLED")
-	log.Println("AVITO_AUTO_TOKEN_REFRESH:", clientID != "" && clientSecret != "")
-	log.Println("AVITO_ACCOUNT_ID:", accountID)
-	log.Println("AVITO_CHAT_ID:", chatID)
+	log.Println("AVITO_SOURCES_CONFIG:", configPath)
+	log.Println("AVITO_SOURCES_COUNT:", len(sources))
 	log.Println("POLL_INTERVAL:", interval)
 
-	client := avito.NewClient(accessToken, clientID, clientSecret)
-	poller := avito.NewPoller(client, svc, accountID, chatID, interval)
-	go poller.Run(context.Background())
+	for _, source := range sources {
+		log.Println("AVITO SOURCE ENABLED:", source.Name, source.Source, source.AccountID, source.ChatID)
+		client := avito.NewClient(source.AccessToken, source.ClientID, source.ClientSecret)
+		poller := avito.NewPoller(client, svc, source, interval)
+		go poller.Run(context.Background())
+	}
+}
+
+func loadPollSources(configPath, accountAlias, accessToken, clientID, clientSecret, accountID, chatID string) ([]avito.PollSource, error) {
+	if configPath != "" {
+		sources, err := avito.LoadSourcesConfig(configPath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil, err
+			}
+			return nil, err
+		}
+		return sources, nil
+	}
+
+	if accessToken == "" && (clientID == "" || clientSecret == "") {
+		return nil, nil
+	}
+	if accountID == "" || chatID == "" {
+		return nil, nil
+	}
+
+	return []avito.PollSource{
+		{
+			Name:         accountAlias,
+			Source:       "polling: Проверка транспорта",
+			AccountID:    accountID,
+			ChatID:       chatID,
+			AccessToken:  accessToken,
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+			Enabled:      true,
+		},
+	}, nil
 }

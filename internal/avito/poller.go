@@ -9,12 +9,14 @@ import (
 )
 
 type SystemMessageHandler interface {
-	ProcessSystemMessage(ctx context.Context, source, accountID, chatID, text string)
+	ProcessSystemMessage(ctx context.Context, alias, source, accountID, chatID, text string)
 }
 
 type Poller struct {
 	client            *Client
 	handler           SystemMessageHandler
+	name              string
+	source            string
 	accountID         string
 	chatID            string
 	interval          time.Duration
@@ -26,12 +28,14 @@ type Poller struct {
 	outageAlert       bool
 }
 
-func NewPoller(client *Client, handler SystemMessageHandler, accountID, chatID string, interval time.Duration) *Poller {
+func NewPoller(client *Client, handler SystemMessageHandler, source PollSource, interval time.Duration) *Poller {
 	return &Poller{
 		client:    client,
 		handler:   handler,
-		accountID: accountID,
-		chatID:    chatID,
+		name:      source.Name,
+		source:    source.Source,
+		accountID: source.AccountID,
+		chatID:    source.ChatID,
 		interval:  interval,
 		startedAt: time.Now().Unix(),
 		seen:      make(map[string]struct{}),
@@ -39,7 +43,7 @@ func NewPoller(client *Client, handler SystemMessageHandler, accountID, chatID s
 }
 
 func (p *Poller) Run(ctx context.Context) {
-	audit.Logf("AVITO POLLER STARTED")
+	audit.Logf("AVITO POLLER STARTED: name=%s source=%s account_id=%s chat_id=%s", p.name, p.source, p.accountID, p.chatID)
 	p.poll(ctx)
 
 	ticker := time.NewTicker(p.interval)
@@ -48,7 +52,7 @@ func (p *Poller) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			audit.Logf("AVITO POLLER STOPPED")
+			audit.Logf("AVITO POLLER STOPPED: name=%s source=%s account_id=%s chat_id=%s", p.name, p.source, p.accountID, p.chatID)
 			return
 		case <-ticker.C:
 			p.poll(ctx)
@@ -100,8 +104,8 @@ func (p *Poller) poll(ctx context.Context) {
 		}
 
 		newCount++
-		audit.Logf("AVITO POLLER NEW SYSTEM MESSAGE: id=%s direction=%s account_id=%s chat_id=%s text=%q", msg.ID, msg.Direction, p.accountID, p.chatID, preview(msg.Content.Text))
-		p.handler.ProcessSystemMessage(ctx, "polling: Проверка транспорта", p.accountID, p.chatID, msg.Content.Text)
+		audit.Logf("AVITO POLLER NEW SYSTEM MESSAGE: id=%s direction=%s name=%s source=%s account_id=%s chat_id=%s text=%q", msg.ID, msg.Direction, p.name, p.source, p.accountID, p.chatID, preview(msg.Content.Text))
+		p.handler.ProcessSystemMessage(ctx, p.name, p.source, p.accountID, p.chatID, msg.Content.Text)
 	}
 
 	if !p.ready {
@@ -122,6 +126,7 @@ func (p *Poller) sendAuthAlert(ctx context.Context) {
 
 	p.handler.ProcessSystemMessage(
 		ctx,
+		p.name,
 		"polling: ошибка Avito token",
 		p.accountID,
 		p.chatID,
@@ -139,6 +144,7 @@ func (p *Poller) sendOutageAlert(ctx context.Context, err error) {
 	audit.Logf("AVITO API OUTAGE ALERT SENT: account_id=%s chat_id=%s consecutive_errors=%d", p.accountID, p.chatID, p.consecutiveErrors)
 	p.handler.ProcessSystemMessage(
 		ctx,
+		p.name,
 		"polling: ошибка Avito API",
 		p.accountID,
 		p.chatID,
@@ -150,6 +156,7 @@ func (p *Poller) sendRecoveryAlert(ctx context.Context) {
 	audit.Logf("AVITO API RECOVERY ALERT SENT: account_id=%s chat_id=%s", p.accountID, p.chatID)
 	p.handler.ProcessSystemMessage(
 		ctx,
+		p.name,
 		"polling: Avito API восстановился",
 		p.accountID,
 		p.chatID,

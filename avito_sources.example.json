@@ -1,0 +1,22 @@
+{
+  "sources": [
+    {
+      "enabled": true,
+      "name": "Omoda Samara",
+      "source": "polling: Проверка транспорта",
+      "account_id": "375283938",
+      "chat_id": "a2u-413531671-375283938",
+      "client_id": "your_avito_client_id",
+      "client_secret": "your_avito_client_secret"
+    },
+    {
+      "enabled": false,
+      "name": "Jaecoo Samara",
+      "source": "polling: Проверка транспорта",
+      "account_id": "another_account_id",
+      "chat_id": "another_chat_id",
+      "client_id": "your_avito_client_id",
+      "client_secret": "your_avito_client_secret"
+    }
+  ]
+}
