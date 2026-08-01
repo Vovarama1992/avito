@@ -22,16 +22,39 @@ type SourcesConfig struct {
 }
 
 func LoadSourcesConfig(path string) ([]PollSource, error) {
-	raw, err := os.ReadFile(path)
+	cfg, err := LoadFullSourcesConfig(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var cfg SourcesConfig
-	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return nil, fmt.Errorf("decode avito sources config: %w", err)
+	return EnabledSources(cfg)
+}
+
+func LoadFullSourcesConfig(path string) (SourcesConfig, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return SourcesConfig{}, err
 	}
 
+	var cfg SourcesConfig
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		return SourcesConfig{}, fmt.Errorf("decode avito sources config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+func SaveSourcesConfig(path string, cfg SourcesConfig) error {
+	raw, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode avito sources config: %w", err)
+	}
+	raw = append(raw, '\n')
+
+	return os.WriteFile(path, raw, 0600)
+}
+
+func EnabledSources(cfg SourcesConfig) ([]PollSource, error) {
 	var sources []PollSource
 	for i, source := range cfg.Sources {
 		if !source.Enabled {

@@ -34,13 +34,37 @@ Example:
 
 To add a new account/chat:
 
-1. Add one object to `sources`.
-2. Set `enabled` to `true`.
-3. Fill `name`, `account_id`, `chat_id`, `client_id`, and `client_secret`.
-4. Restart the service:
+```sh
+cd /var/www/avito
+./avito-monitor sources add \
+  -name "Jaecoo Samara" \
+  -account-id "ACCOUNT_ID" \
+  -chat-id "CHAT_ID" \
+  -client-id "CLIENT_ID" \
+  -client-secret "CLIENT_SECRET"
+systemctl restart avito-monitor
+```
+
+To show configured sources:
 
 ```sh
 cd /var/www/avito
+./avito-monitor sources list
+```
+
+To temporarily disable a source:
+
+```sh
+cd /var/www/avito
+./avito-monitor sources disable -name "Jaecoo Samara"
+systemctl restart avito-monitor
+```
+
+To enable it again:
+
+```sh
+cd /var/www/avito
+./avito-monitor sources enable -name "Jaecoo Samara"
 systemctl restart avito-monitor
 ```
 
